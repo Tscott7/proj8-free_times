@@ -55,6 +55,7 @@
 
 <h2>Date range</h2>
   <form action="/setrange" method="post">
+  <input type="text" name="timerange" size="12" value="09:00 - 17:00">
   <input type="text" name="daterange" size="12"
     {% if session.daterange is defined %}
          value="{{session.daterange}}"
@@ -89,18 +90,41 @@
     prefer down then across). 
     -->
 {% if g.calendars is defined  %}
-  <div class="row">
-  {% for cal in g.calendars if cal.selected %}
+  <form method="POST" action="/_list" id="list" name="list">
+    <fieldset>
+    <legend>Choose the calendars you wish to include.</legend>
+      <div class="row">
+        {% for cal in g.calendars if cal.selected %}
           <div class="col-md-4">
-	   {{ cal.summary }}
+            <input type="checkbox" id="{{ cal.summary }}" name="interest" value="{{ cal.summary }}">
+            <label for="{{ cal.summary }}">{{ cal.summary }}</label>
           </div>
-         {% if loop.index is divisibleby 3 %}
+          {% if loop.index is divisibleby 3 %}
           </div> <div class="row">
-         {% endif %}
-  {% endfor %}
+          {% endif %}
+        {% endfor %}
+      </div>
+      <input type="submit" value="Submit" />
+    </fieldset>
+  </form>
+{% endif %}
+
+{% if g.list is defined %}
+  <div class="row">
+    {% for events in g.list %}
+      <div class="col-md-4">
+        <label for="{{ events.summary }}">{{ events.summary }}</label>
+        <label for="{{ events.start.dateTime }}">{{ events.start.dateTime | humanize }} {{ events.start.dateTime }}</label>
+        <br />
+      </div>
+      </div> <div class="row">
+    {% endfor %}
   </div>
 {% endif %}
-    
+
+
+
+
 
   </div>  <!-- container (for bootstrap) -->
   </body> </html>

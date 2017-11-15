@@ -69,6 +69,78 @@ def choose():
     flask.g.calendars = list_calendars(gcal_service)
     return render_template('index.html')
 
+@app.route("/_list", methods=["POST"])
+def list():
+    app.logger.debug("Checking credentials for Google calendar access")
+    credentials = valid_credentials()
+    if not credentials:
+      app.logger.debug("Redirecting to authorization")
+      return flask.redirect(flask.url_for('oauth2callback'))
+    gcal_service = get_gcal_service(credentials)
+    flask.g.calendars = list_calendars(gcal_service)
+    app.logger.debug("Printing list of times")
+    selected_cals = flask.request.form.getlist("interest")
+    counter = 0
+    session_begin_date = str(flask.session["begin_date"])[:10]
+    session_end_date = str(flask.session["end_date"])[:10]
+    session_begin_time = str(flask.session["begin_time"])[11:16]
+    session_end_time = str(flask.session["end_time"])[11:16]
+    session_begin_datetime = arrow.get(session_begin_date + ' ' + session_begin_time, 'YYYY-MM-DD HH:mm')
+    session_end_datetime = arrow.get(session_end_date + ' ' + session_end_time, 'YYYY-MM-DD HH:mm')
+    app.logger.debug("session_begin_datetime = " + str(session_begin_datetime))
+    app.logger.debug("session_end_datetime = " + str(session_end_datetime))
+    for cal_str in selected_cals:
+      for cal_obj in flask.g.calendars:
+        if cal_obj['summary'] == cal_str:
+          selected_cals[counter] = cal_obj
+      counter += 1
+    app.logger.debug("selected_cals = " + str(selected_cals))
+    app.logger.debug("flask.g.calendars = " + str(flask.g.calendars))
+    now = arrow.now()
+    print('Getting the events.')
+    finished_events = []
+    for cal in selected_cals:
+      eventsResult = gcal_service.events().list(
+          calendarId=cal['id'], timeMin=now, maxResults=10, singleEvents=True,
+          orderBy='startTime').execute()
+      events = eventsResult.get('items', [])
+      app.logger.debug("events = " + str(events))
+      for i in events:
+        try:
+          if 'transparency' in i:
+            app.logger.debug("Transparent event = " + i['summary'])
+            continue
+        except:
+          app.logger.debug("Issue checking event transparncy in: " + i['summary'])
+        try:
+          if 'start' in i:
+            if 'date' in i['start']:
+              check_date = arrow.get(i['start']['date'], 'YYYY-MM-DD')
+              if session_begin_datetime <= check_date <= session_end_datetime: 
+                finished_events.append(i)
+                continue
+            if 'dateTime' in i['start']:
+              check_date = arrow.get(i['start']['dateTime'])
+              if session_begin_datetime <= check_date <= session_end_datetime:
+                finished_events.append(i)
+                continue
+          if 'end' in i:
+            if 'date' in i['end']:
+              check_date = arrow.get(i['end']['date'], 'YYYY-MM-DD')
+              if session_begin_datetime <= check_date <= session_end_datetime: 
+                finished_events.append(i)
+                continue
+            if 'dateTime' in i['end']:
+              check_date = arrow.get(i['end']['dateTime'])
+              if session_begin_datetime <= check_date <= session_end_datetime:
+                finished_events.append(i)
+                continue
+          app.logger.debug("Could not parse time in event: " + i['summary'])
+        except:
+          app.logger.debug("Could not parse time in event: " + i['summary'])
+    flask.g.list = finished_events
+    return render_template('index.html')
+
 ####
 #
 #  Google calendar authorization:
@@ -192,17 +264,47 @@ def setrange():
     widget.
     """
     app.logger.debug("Entering setrange")  
-    flask.flash("Setrange gave us '{}'".format(
-      request.form.get('daterange')))
+    flask.flash("Setrange gave us '{}' '{}'".format(
+      request.form.get('daterange'), request.form.get('timerange')))
     daterange = request.form.get('daterange')
+    timerange = request.form.get('timerange')
     flask.session['daterange'] = daterange
+    flask.session['timerange'] = timerange
+    timerange_parts = timerange.split()
+    flask.session['begin_time'] = interpret_time(timerange_parts[0])
+    flask.session['end_time'] = interpret_time(timerange_parts[2])
     daterange_parts = daterange.split()
     flask.session['begin_date'] = interpret_date(daterange_parts[0])
     flask.session['end_date'] = interpret_date(daterange_parts[2])
     app.logger.debug("Setrange parsed {} - {}  dates as {} - {}".format(
       daterange_parts[0], daterange_parts[1], 
       flask.session['begin_date'], flask.session['end_date']))
+    app.logger.debug("Setrange parsed {} - {}  dates as {} - {}".format(
+      timerange_parts[0], timerange_parts[1], 
+      flask.session['begin_time'], flask.session['end_time']))
     return flask.redirect(flask.url_for("choose"))
+
+@app.template_filter( 'humanize' )
+def humanize_arrow_date( date ):
+    """
+    Taken from proj6-mongo
+    Date is internal UTC ISO format string.
+    Output should be "today", "yesterday", "in 5 days", etc.
+    Arrow will try to humanize down to the minute, so we
+    need to catch 'today' as a special case. 
+    """
+    try:
+        then = arrow.get(date).to('local')
+        now = arrow.utcnow().to('local')
+        if then.date() == now.date():
+            human = "Today"
+        else: 
+            human = then.humanize(now)
+            if human == "in a day":
+                human = "Tomorrow"
+    except: 
+        human = date
+    return human
 
 ####
 #
