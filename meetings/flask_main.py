@@ -2,8 +2,8 @@ import flask
 from flask import render_template
 from flask import request
 from flask import url_for
+from free_times import calculate_free_times, sort, merge
 import uuid
-
 import json
 import logging
 
@@ -19,6 +19,7 @@ import httplib2   # used in oauth2 flow
 
 # Google API for services 
 from apiclient import discovery
+
 
 ###
 # Globals
@@ -99,6 +100,7 @@ def list():
     now = arrow.now()
     print('Getting the events.')
     finished_events = []
+    finished_event_times = []
     for cal in selected_cals:
       eventsResult = gcal_service.events().list(
           calendarId=cal['id'], timeMin=now, maxResults=10, singleEvents=True,
@@ -123,6 +125,7 @@ def list():
               check_date = arrow.get(i['start']['dateTime'])
               if session_begin_datetime <= check_date <= session_end_datetime:
                 finished_events.append(i)
+                finished_event_times.append([arrow.get(i['start']['dateTime']), arrow.get(i['end']['dateTime'])])
                 continue
           if 'end' in i:
             if 'date' in i['end']:
@@ -134,11 +137,23 @@ def list():
               check_date = arrow.get(i['end']['dateTime'])
               if session_begin_datetime <= check_date <= session_end_datetime:
                 finished_events.append(i)
+                finished_event_times.append([arrow.get(i['start']['dateTime']), arrow.get(i['end']['dateTime'])])
                 continue
           app.logger.debug("Could not parse time in event: " + i['summary'])
         except:
           app.logger.debug("Could not parse time in event: " + i['summary'])
     flask.g.list = finished_events
+    app.logger.debug("finished_event_times = " + str(finished_event_times))
+    free_times = calculate_free_times(finished_event_times, session_begin_datetime, session_end_datetime)
+    final_free_times = []
+    for se in free_times:
+      sd = str(se[0])[:10]
+      st = str(se[0])[11:16]
+      ed = str(se[1])[:10]
+      et = str(se[1])[11:16]
+      final_free_times.append('{} at {} to {} at {}'.format(sd, st, ed, et))
+    app.logger.debug("free_times = " + str(free_times))
+    flask.g.free = final_free_times
     return render_template('index.html')
 
 ####

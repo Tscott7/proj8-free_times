@@ -110,11 +110,25 @@
 {% endif %}
 
 {% if g.list is defined %}
+  <b>Busy Times
   <div class="row">
     {% for events in g.list %}
       <div class="col-md-4">
         <label for="{{ events.summary }}">{{ events.summary }}</label>
         <label for="{{ events.start.dateTime }}">{{ events.start.dateTime | humanize }} {{ events.start.dateTime }}</label>
+        <br />
+      </div>
+      </div> <div class="row">
+    {% endfor %}
+  </div>
+{% endif %}
+
+{% if g.free is defined %}
+  <b>Free Times
+  <div class="row">
+    {% for ft in g.free %}
+      <div class="col-md-4">
+        <label for="{{ ft }}">{{ ft }}</label>
         <br />
       </div>
       </div> <div class="row">

@@ -13,4 +13,6 @@ google account. We then use their google calendar information to find out when t
 'busy' between the target date and time range. The client then prints out the events 
 where the user is 'busy' within the time range, accounting for transparent events as well.
 I also humanized the dates similar to project 6 so that it says their event is in x amount
-of days as well as the date in ISO form.
+of days as well as the date in ISO form. It then calculates and prints out the times the 
+client is 'free' within the time range. We will use this in the next project to calculate
+when multiple users are 'free' within a given time range.
